@@ -1,3 +1,7 @@
-from django.shortcuts import render
+from rest_framework import viewsets
+from .models import Miembro
+from .serializers import MiembroSerializer
 
-# Create your views here.
+class MiembroViewSet(viewsets.ModelViewSet):
+    queryset = Miembro.objects.all()
+    serializer_class = MiembroSerializer

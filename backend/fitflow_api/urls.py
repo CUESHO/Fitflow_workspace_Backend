@@ -15,8 +15,16 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
+from rest_framework.routers import DefaultRouter
+from gym_core.views import MiembroViewSet
+
+# Creamos un router que auto-genera las rutas REST
+router = DefaultRouter()
+router.register(r'usuarios', MiembroViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Aquí conectamos todas las rutas de la API en el endpoint /api/
+    path('api/', include(router.urls)),
 ]
