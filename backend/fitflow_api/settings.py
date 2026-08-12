@@ -38,14 +38,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'gym_core',
     'rest_framework',
     'corsheaders',
-    
+    'gym_core',
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -79,8 +79,12 @@ WSGI_APPLICATION = 'fitflow_api.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'fitflow_db', # Asegúrate de haber creado esta base de datos vacía en pgAdmin
+        'USER': 'postgres',
+        'PASSWORD': 'Zer0',
+        'HOST': 'localhost',
+        'PORT': '5433', # El puerto clave de tu versión 14
     }
 }
 
@@ -120,3 +124,14 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Configuración de CORS y REST Framework
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:4200", # El puerto donde corre tu Angular
+]
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.AllowAny', # Por ahora lo dejamos abierto para facilitar el desarrollo
+    ]
+}
