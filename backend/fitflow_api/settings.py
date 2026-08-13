@@ -1,49 +1,77 @@
-from pathlib import Path
-import os
-from dotenv import load_dotenv
-import sys
-import dj_database_url
+"""
+Configuración de Django para el proyecto FitFlow.
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
+Backend: Django REST Framework
+Base de datos: PostgreSQL (FitFlow_Workspace)
+Panel de administración: Jazzmin
+"""
+
+import os
+import sys
+from pathlib import Path
+
+import dj_database_url
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-load_dotenv()
-ENV = os.getenv('ENV')
-env_path = os.path.join(BASE_DIR, f'.env.{ENV}')
-load_dotenv(env_path)
-print(f'\nEnvironment: {ENV}')
+# .env define únicamente ENV (dev | prod); luego se carga .env.<ENV>
+#
+# override=False es importante: en Render las variables reales (DATABASE_URL,
+# SECRET_KEY...) ya viven en el entorno y NO deben ser pisadas por el archivo
+# .env.prod del repositorio, que sólo contiene valores de ejemplo.
+load_dotenv(BASE_DIR / ".env", override=False)
+ENV = os.getenv("ENV", "dev")
+load_dotenv(BASE_DIR / f".env.{ENV}", override=False)
+print(f"\nEnvironment: {ENV}")
 
-# Env variables
-ADMIN_EMAIL = os.getenv('ADMIN_EMAIL') 
-SECRET_KEY = os.getenv('SECRET_KEY')
-DEBUG = os.getenv('DEBUG', 'False') == 'True'
-TEST_HEADLESS = os.getenv('TEST_HEADLESS') == 'True'
-STORAGE_AWS = os.environ.get("STORAGE_AWS") == "True"
 
-# Quick-start development settings - unsuitable for production
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '').split(',')
+def csv_env(nombre, default=""):
+    """Convierte 'a,b,c' en ['a', 'b', 'c'] descartando valores vacíos.
 
-# Application definition
+    Sin esto, ''.split(',') devuelve [''] y Django/CORS fallan.
+    """
+    return [valor.strip() for valor in os.getenv(nombre, default).split(",") if valor.strip()]
+
+
+SECRET_KEY = os.getenv("SECRET_KEY", "clave-insegura-solo-para-desarrollo")
+DEBUG = os.getenv("DEBUG", "False") == "True"
+ADMIN_EMAIL = os.getenv("ADMIN_EMAIL")
+
+ALLOWED_HOSTS = csv_env("ALLOWED_HOSTS", "127.0.0.1,localhost")
+
+# Render publica el dominio de la app en esta variable de entorno.
+RENDER_EXTERNAL_HOSTNAME = os.getenv("RENDER_EXTERNAL_HOSTNAME")
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
+# ==========================================
+# APLICACIONES
+# ==========================================
 INSTALLED_APPS = [
-    # Tu app de FitFlow
-    "gym_core",
-    
-    # Jazzmin para el admin
+    # Jazzmin debe ir ANTES de django.contrib.admin para reemplazar sus plantillas.
     "jazzmin",
-
-    # Django apps
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
-    "django.contrib.staticfiles",
+    # whitenoise.runserver_nostatic va antes de staticfiles.
     "whitenoise.runserver_nostatic",
+    "django.contrib.staticfiles",
+    # Librerías de terceros
+    "rest_framework",
+    "django_filters",
+    "corsheaders",
+    # Aplicación propia de FitFlow
+    "gym_core",
 ]
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # CorsMiddleware debe ir lo más arriba posible y antes de CommonMiddleware.
+    "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -53,6 +81,7 @@ MIDDLEWARE = [
 ]
 
 ROOT_URLCONF = "fitflow_api.urls"
+WSGI_APPLICATION = "fitflow_api.wsgi.application"
 
 TEMPLATES = [
     {
@@ -70,170 +99,148 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = "fitflow_api.wsgi.application"
+# ==========================================
+# BASE DE DATOS (PostgreSQL, nunca sqlite3)
+# ==========================================
+IS_TESTING = len(sys.argv) > 1 and sys.argv[1] == "test"
 
-# Database
-# Setup database for testing and production
-IS_TESTING = len(sys.argv) > 1 and sys.argv[1] == 'test'
-
-# Opciones específicas si en algún momento deciden probar con MySQL
-options = {}
-if os.environ.get("DB_ENGINE") == "django.db.backends.mysql":
-    options = {
-        'init_command': "SET sql_mode='STRICT_TRANS_TABLES'",
-        'charset': 'utf8mb4',
-    }
-
-# --- CÓDIGO LIMPIO: SOLO POSTGRESQL O MYSQL ---
-# 1. Si Render inyecta la DATABASE_URL, úsala (Producción)
-if os.environ.get("DATABASE_URL"):
+if os.getenv("DATABASE_URL"):
+    # Producción: Render inyecta DATABASE_URL automáticamente.
     DATABASES = {
-        'default': dj_database_url.config(
-            default=os.environ.get("DATABASE_URL"),
-            conn_max_age=600 
+        "default": dj_database_url.config(
+            default=os.getenv("DATABASE_URL"),
+            conn_max_age=600,
+            ssl_require=not DEBUG,
         )
     }
-# 2. Si no hay URL en la nube, usamos la configuración de tu .env.dev (Local)
 else:
+    # Desarrollo local: datos tomados de .env.dev
     DATABASES = {
-        'default': {
-            'ENGINE': os.environ.get("DB_ENGINE", "django.db.backends.postgresql"),
-            'NAME': os.environ.get("DB_NAME"),
-            'USER': os.environ.get("DB_USER"),
-            'PASSWORD': os.environ.get("DB_PASSWORD"),
-            'HOST': os.environ.get("DB_HOST"),
-            'PORT': os.environ.get("DB_PORT"),
-            'OPTIONS': options,
+        "default": {
+            "ENGINE": os.getenv("DB_ENGINE", "django.db.backends.postgresql"),
+            "NAME": os.getenv("DB_NAME"),
+            "USER": os.getenv("DB_USER"),
+            "PASSWORD": os.getenv("DB_PASSWORD"),
+            "HOST": os.getenv("DB_HOST", "localhost"),
+            "PORT": os.getenv("DB_PORT", "5432"),
         }
     }
 
-# Setup de Stripe dependiendo si están en modo test o producción
-if IS_TESTING:
-    STRIPE_API_USER = os.getenv('STRIPE_API_USER_TEST')
-else:
-    STRIPE_API_USER = os.getenv('STRIPE_API_USER')
+# ==========================================
+# DJANGO REST FRAMEWORK
+# ==========================================
+REST_FRAMEWORK = {
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+    # Sin paginación: la API devuelve una lista simple, que es lo que
+    # consumen los servicios de Angular con get<T[]>().
+    "DEFAULT_PAGINATION_CLASS": None,
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
+}
 
-# Password validation
+# ==========================================
+# CORS (para que Angular pueda consumir la API)
+# ==========================================
+CORS_ALLOWED_ORIGINS = csv_env("ALLOWED_ORIGINS", "http://localhost:4200")
+CSRF_TRUSTED_ORIGINS = [
+    origen for origen in CORS_ALLOWED_ORIGINS if origen.startswith("http")
+]
+if RENDER_EXTERNAL_HOSTNAME:
+    CSRF_TRUSTED_ORIGINS.append(f"https://{RENDER_EXTERNAL_HOSTNAME}")
+
+# ==========================================
+# VALIDACIÓN DE CONTRASEÑAS
+# ==========================================
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
-# Internationalization
+# ==========================================
+# INTERNACIONALIZACIÓN
+# ==========================================
 LANGUAGE_CODE = "es-mx"
 TIME_ZONE = "America/Mexico_City"
 USE_I18N = True
 USE_TZ = True
 
-# STATICFILES_DIRS = [
-#    os.path.join(BASE_DIR, 'mi_app/static'),
-# ]
-
-# Default primary key field type
-DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
-
-# Global datetime format
 DATE_FORMAT = "d/b/Y"
 TIME_FORMAT = "H:i"
 DATETIME_FORMAT = f"{DATE_FORMAT} {TIME_FORMAT}"
 
-# Email settings
-EMAIL_HOST = os.getenv('EMAIL_HOST')
-EMAIL_PORT = os.getenv('EMAIL_PORT')
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
-EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL')
-
-#Host settings
-HOST = os.getenv('HOST')
-
-#Stripe settings
-STRIPE_API_HOST = os.getenv('STRIPE_API_HOST')
-
-# Storage settings
-if STORAGE_AWS:
-    # aws settings
-    AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
-    AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
-    AWS_STORAGE_BUCKET_NAME = os.getenv('AWS_STORAGE_BUCKET_NAME')
-    AWS_DEFAULT_ACL = None
-    AWS_S3_CUSTOM_DOMAIN = f'{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com'
-    AWS_S3_OBJECT_PARAMETERS = {'CacheControl': 'max-age=86400'}
-
-    # s3 static settings
-    STATIC_LOCATION = 'static'
-    STATIC_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{STATIC_LOCATION}/'
-    STATICFILES_STORAGE = 'fitflow_api.storage_backends.StaticStorage'
-    
-    # s3 public media settings
-    PUBLIC_MEDIA_LOCATION = 'media'
-    MEDIA_URL = f'https://{AWS_S3_CUSTOM_DOMAIN}/{PUBLIC_MEDIA_LOCATION}/'
-    DEFAULT_FILE_STORAGE = 'fitflow_api.storage_backends.PublicMediaStorage'
-
-    # s3 private media settings
-    PRIVATE_MEDIA_LOCATION = 'private'
-    PRIVATE_FILE_STORAGE = 'fitflow_api.storage_backends.PrivateMediaStorage'
-    
-    STATIC_ROOT = None
-    MEDIA_ROOT = None
-else:
-    # Local development 
-    STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-    MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-    
-    STATIC_URL = '/static/'
-    MEDIA_URL = '/media/'
-
-# Cors
-CORS_ALLOWED_ORIGINS = os.getenv('ALLOWED_ORIGINS', '').split(',')
-CSRF_TRUSTED_ORIGINS = os.getenv('ALLOWED_ORIGINS', '').split(',')
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ==========================================
-# JAZZMIN SETTINGS (FITFLOW ADMIN)
+# ARCHIVOS ESTÁTICOS (servidos por WhiteNoise)
+# ==========================================
+STATIC_URL = "/static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        # Comprime los estáticos sin generar manifiesto. Se evita
+        # CompressedManifestStaticFilesStorage porque Jazzmin referencia
+        # archivos que no siempre existen y rompería el collectstatic.
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+    },
+}
+
+# ==========================================
+# SEGURIDAD EN PRODUCCIÓN
+# ==========================================
+if not DEBUG:
+    # Render entrega el tráfico por HTTPS a través de su proxy.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 año
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+# ==========================================
+# JAZZMIN (PANEL DE ADMINISTRACIÓN)
 # ==========================================
 JAZZMIN_SETTINGS = {
     "site_title": "FitFlow Admin",
     "site_header": "FitFlow",
     "site_brand": "FitFlow Dashboard",
     "welcome_sign": "Bienvenido al control de afluencia de FitFlow",
-    "copyright": "Aarón Castañeda © 2026",
+    "copyright": "Aarón Castañeda",
     "search_model": ["gym_core.Miembro"],
-    
-    # Menú superior
     "topmenu_links": [
-        {"name": "Inicio",  "url": "admin:index", "permissions": ["auth.view_user"]},
-        {"name": "Ver Frontend Angular", "url": "http://localhost:4200", "new_window": True},
+        {"name": "Inicio", "url": "admin:index", "permissions": ["auth.view_user"]},
+        {"name": "API REST", "url": "/api/", "new_window": True},
     ],
-
-    # Íconos para tus 5 tablas
     "icons": {
         "auth": "fas fa-users-cog",
         "auth.user": "fas fa-user",
         "auth.Group": "fas fa-users",
-        "gym_core.Area": "fas fa-map-marker-alt",
         "gym_core.Miembro": "fas fa-dumbbell",
-        "gym_core.RegistroAcceso": "fas fa-clock",
-        "gym_core.Suscripcion": "fas fa-id-card",
         "gym_core.TipoMembresia": "fas fa-tags",
+        "gym_core.Area": "fas fa-map-marker-alt",
+        "gym_core.Suscripcion": "fas fa-id-card",
+        "gym_core.RegistroAcceso": "fas fa-clock",
     },
-    
     "show_sidebar": True,
     "navigation_expanded": True,
     "use_google_fonts_cdn": True,
-    "show_ui_builder": False, 
+    "show_ui_builder": False,
 }
 
-# Forzar el modo oscuro
 JAZZMIN_UI_TWEAKS = {
     "theme": "darkly",
     "dark_mode_theme": "darkly",
