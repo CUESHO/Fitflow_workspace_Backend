@@ -1,0 +1,43 @@
+# =====================================================================
+# Blueprint de Render para el backend de FitFlow (Django REST Framework)
+#
+# Render lee este archivo desde la raíz del repositorio y crea:
+#   1. Una base de datos PostgreSQL gratuita.
+#   2. Un servicio web que ejecuta Django con gunicorn.
+#
+# El frontend de Angular vive en otro repositorio y se publica aparte
+# como "Static Site" (ver README_DESPLIEGUE.md).
+# =====================================================================
+
+databases:
+  - name: fitflow-db
+    databaseName: fitflow
+    user: fitflow
+    plan: free
+
+services:
+  - type: web
+    name: fitflow-backend
+    runtime: python
+    plan: free
+    # El proyecto de Django no está en la raíz del repo, sino en /backend
+    rootDir: backend
+    buildCommand: "chmod +x build.sh && ./build.sh"
+    startCommand: "gunicorn fitflow_api.wsgi:application"
+    envVars:
+      # Render inyecta aquí la cadena de conexión de la base de datos de arriba.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: fitflow-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ENV
+        value: prod
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      # Cambia esta URL por la del sitio estático de Angular cuando la tengas.
+      - key: ALLOWED_ORIGINS
+        value: "https://fitflow-frontend.onrender.com"
