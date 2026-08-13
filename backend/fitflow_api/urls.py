@@ -1,35 +1,42 @@
 """
-URL configuration for fitflow_api project.
+Rutas del proyecto FitFlow.
 
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.0/topics/http/urls/
-Examples:
-Function views
-    1. Add an import:  from my_app import views
-    2. Add a URL to urlpatterns:  path('', views.home, name='home')
-Class-based views
-    1. Add an import:  from other_app.views import Home
-    2. Add a URL to urlpatterns:  path('', Home.as_view(), name='home')
-Including another URLconf
-    1. Import the include() function: from django.urls import include, path
-    2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
+El DefaultRouter de DRF genera automáticamente las rutas CRUD de cada modelo:
+    GET    /api/miembros/       -> listar
+    POST   /api/miembros/       -> crear
+    GET    /api/miembros/{id}/  -> recuperar
+    PUT    /api/miembros/{id}/  -> actualizar
+    DELETE /api/miembros/{id}/  -> eliminar
 """
-from django.contrib import admin
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from gym_core.views import (MiembroViewSet, TipoMembresiaViewSet, 
-                            SuscripcionViewSet, AreaViewSet, RegistroAccesoViewSet)
 
-# El router hace la magia de crear las rutas automáticamente
+from django.conf import settings
+from django.conf.urls.static import static
+from django.contrib import admin
+from django.urls import include, path
+from django.views.generic import RedirectView
+from rest_framework.routers import DefaultRouter
+
+from gym_core.views import (
+    AreaViewSet,
+    MiembroViewSet,
+    RegistroAccesoViewSet,
+    SuscripcionViewSet,
+    TipoMembresiaViewSet,
+)
+
 router = DefaultRouter()
-router.register(r'usuarios', MiembroViewSet)
-router.register(r'membresias', TipoMembresiaViewSet)
-router.register(r'suscripciones', SuscripcionViewSet)
-router.register(r'areas', AreaViewSet)
-router.register(r'accesos', RegistroAccesoViewSet)
+router.register(r"miembros", MiembroViewSet)
+router.register(r"tipos-membresia", TipoMembresiaViewSet)
+router.register(r"areas", AreaViewSet)
+router.register(r"suscripciones", SuscripcionViewSet)
+router.register(r"accesos", RegistroAccesoViewSet)
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    # Aquí conectamos todas las rutas generadas bajo el prefijo /api/
-    path('api/', include(router.urls)), 
+    path("admin/", admin.site.urls),
+    path("api/", include(router.urls)),
+    # La raíz del sitio lleva al panel de administración.
+    path("", RedirectView.as_view(url="/admin/", permanent=False)),
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
