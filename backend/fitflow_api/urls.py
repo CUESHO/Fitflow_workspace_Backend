@@ -17,14 +17,19 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from gym_core.views import MiembroViewSet
+from gym_core.views import (MiembroViewSet, TipoMembresiaViewSet, 
+                            SuscripcionViewSet, AreaViewSet, RegistroAccesoViewSet)
 
-# Creamos un router que auto-genera las rutas REST
+# El router hace la magia de crear las rutas automáticamente
 router = DefaultRouter()
 router.register(r'usuarios', MiembroViewSet)
+router.register(r'membresias', TipoMembresiaViewSet)
+router.register(r'suscripciones', SuscripcionViewSet)
+router.register(r'areas', AreaViewSet)
+router.register(r'accesos', RegistroAccesoViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    # Aquí conectamos todas las rutas de la API en el endpoint /api/
-    path('api/', include(router.urls)),
+    # Aquí conectamos todas las rutas generadas bajo el prefijo /api/
+    path('api/', include(router.urls)), 
 ]
