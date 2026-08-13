@@ -41,3 +41,15 @@ services:
       # Cambia esta URL por la del sitio estático de Angular cuando la tengas.
       - key: ALLOWED_ORIGINS
         value: "https://fitflow-frontend.onrender.com"
+      # Datos del administrador. "sync: false" hace que Render te los pida al
+      # desplegar, de modo que la contraseña nunca queda escrita en el
+      # repositorio. Los usa build.sh para crear el superusuario.
+      - key: DJANGO_SUPERUSER_USERNAME
+        sync: false
+      - key: DJANGO_SUPERUSER_EMAIL
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+      # Ponlo en True si quieres que la base arranque con datos de ejemplo.
+      - key: SEED_DEMO
+        value: "False"

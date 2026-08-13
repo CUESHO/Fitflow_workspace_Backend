@@ -39,19 +39,30 @@ El proyecto son **dos repositorios separados**, así que en Render se crean
 
 ### Crear el usuario administrador
 
-Cuando el servicio esté en línea, abre la pestaña **Shell** en Render y ejecuta:
+El superusuario que creaste en tu computadora **no existe en Render**: allá la base
+de datos es nueva y está vacía. Y como el plan gratuito de Render no incluye
+consola (Shell), no se puede ejecutar `createsuperuser` a mano.
 
-```bash
-python manage.py createsuperuser
-```
+Por eso `build.sh` lo crea automáticamente a partir de tres variables de entorno
+que tú defines en el panel de Render. Nunca se escriben en el repositorio:
 
-Si quieres cargar datos de ejemplo para la presentación:
+| Variable | Ejemplo |
+|---|---|
+| `DJANGO_SUPERUSER_USERNAME` | `aaron` |
+| `DJANGO_SUPERUSER_EMAIL` | `tucorreo@ejemplo.com` |
+| `DJANGO_SUPERUSER_PASSWORD` | *(una contraseña que sólo tú elijas)* |
 
-```bash
-python manage.py seed_demo
-```
+Con esas variables definidas, el primer despliegue deja la cuenta lista para
+entrar en `https://TU-BACKEND.onrender.com/admin/`.
 
-El panel de administración con Jazzmin queda en `https://TU-BACKEND.onrender.com/admin/`.
+Si en algún momento quieres cambiar la contraseña, actualiza la variable, borra
+el usuario desde el panel de administración y vuelve a lanzar el despliegue.
+
+### Datos de ejemplo
+
+Si quieres que la base arranque con miembros, áreas y accesos de ejemplo para la
+presentación, pon la variable `SEED_DEMO` en `True` y vuelve a desplegar.
+Déjala en `False` cuando ya no la necesites.
 
 ---
 
