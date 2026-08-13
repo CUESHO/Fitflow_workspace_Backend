@@ -38,9 +38,11 @@ services:
         value: "False"
       - key: PYTHON_VERSION
         value: "3.12.7"
-      # Cambia esta URL por la del sitio estático de Angular cuando la tengas.
+      # URL del sitio estático de Angular desplegado en Render.
+      # Si cambia, hay que editarla aquí y no en el panel: el blueprint se
+      # sincroniza solo y sobrescribiría cualquier cambio hecho a mano.
       - key: ALLOWED_ORIGINS
-        value: "https://fitflow-frontend.onrender.com"
+        value: "https://fitflow-frontend-c59m.onrender.com"
       # Datos del administrador. "sync: false" hace que Render te los pida al
       # desplegar, de modo que la contraseña nunca queda escrita en el
       # repositorio. Los usa build.sh para crear el superusuario.
