@@ -52,6 +52,7 @@ services:
         sync: false
       - key: DJANGO_SUPERUSER_PASSWORD
         sync: false
-      # Ponlo en True si quieres que la base arranque con datos de ejemplo.
+      # Carga datos de ejemplo al desplegar. El comando usa get_or_create,
+      # así que puede ejecutarse en cada build sin duplicar registros.
       - key: SEED_DEMO
-        value: "False"
+        value: "True"
